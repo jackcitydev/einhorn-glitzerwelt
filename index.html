@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>Amelies Einhorn-Glitzer</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body {
+      /* Rosa Regenbogen-Hintergrund */
+      background: linear-gradient(180deg, #ffd1e8 0%, #ffc1df 25%, #ffb3d8 50%, #ff9fce 75%, #ff8ac5 100%);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      touch-action: none;
+    }
+    #game { max-width: 100vw; max-height: 100vh; }
+    .hint { position: fixed; left: 50%; transform: translateX(-50%); bottom: 40px; color: #7a0040; font-weight: 600; text-shadow: 0 1px 0 rgba(255,255,255,.7); }
+    .signature { position: fixed; left: 50%; transform: translateX(-50%); bottom: 8px; font-size: 14px; color: #7a0040; text-shadow: 0 1px 0 rgba(255,255,255,.5); font-style: italic; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
+</head>
+<body>
+  <div id="game"></div>
+  <div class="hint">Tipp: Tippen/Klicken = Springen (Doppelsprung möglich)</div>
+  <div class="signature">Junior Entwickler Amelie ✨</div>
+  <script>
+  (() => {
+    const GAME_W = 800;
+    const GAME_H = 450;
+
+    const config = {
+      type: Phaser.AUTO,
+      parent: 'game',
+      width: GAME_W,
+      height: GAME_H,
+      backgroundColor: 'rgba(0,0,0,0)',
+      physics: {
+        default: 'arcade',
+        arcade: { gravity: { y: 1400 }, debug: false }
+      },
+      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+      audio: { disableWebAudio: false }
+    };
+
+    const game = new Phaser.Game(config);
+
+    class MainScene extends Phaser.Scene {
+      constructor() { super('main'); }
+
+      create() {
+        this.score = 0;
+        this.best = +(localStorage.getItem('amelie_best') || 0);
+        this.level = 1;
+        this.collected = 0;
+
+        const groundHeight = 60;
+        this.ground = this.add.rectangle(GAME_W/2, GAME_H - groundHeight/2, GAME_W, groundHeight, 0xffffff, 0.25);
+        this.physics.add.existing(this.ground, true);
+
+        this.playerVisual = this.add.text(140, GAME_H - groundHeight - 40, '💖', { fontSize: '48px' }).setOrigin(0.5);
+        this.player = this.add.circle(this.playerVisual.x, this.playerVisual.y, 22, 0xff2a7f, 0.2);
+        this.physics.add.existing(this.player);
+        this.player.body.setCollideWorldBounds(true);
+        this.player.body.setBounce(0);
+        this.jumpCount = 0;
+
+        this.physics.add.collider(this.player, this.ground, () => { this.jumpCount = 0; });
+
+        const doJump = () => {
+          if (this.player.body.blocked.down || this.jumpCount < 2) {
+            this.player.body.setVelocityY(-560);
+            this.jumpCount++;
+            this.popParticles(this.player.x, this.player.y+10, 6);
+          }
+        };
+        this.input.on('pointerdown', doJump);
+        this.input.keyboard?.on('keydown-SPACE', doJump);
+
+        this.unicornBodies = this.physics.add.group();
+        this.unicornTexts = new Set();
+
+        this.physics.add.overlap(this.player, this.unicornBodies, (player, uniBody) => {
+          if (!uniBody.active) return;
+          this.collectUnicorn(uniBody);
+        });
+
+        this.particles = this.add.particles(0,0, {
+          emitting: false,
+          lifespan: 500,
+          speed: 140,
+          gravityY: 800,
+          scale: { start: 1, end: 0 },
+          tint: [0xff7ab5, 0xffc1df, 0xffffff]
+        });
+
+        this.title = this.add.text(GAME_W/2, 36, 'Amelies Einhorn-Glitzer', {
+          fontSize: '28px', fontStyle: '700', color: '#7a0040', stroke: '#ffffff', strokeThickness: 4
+        }).setOrigin(0.5);
+
+        this.scoreText = this.add.text(16, 12, 'Punkte: 0', { fontSize: '22px', color: '#7a0040', stroke: '#fff', strokeThickness: 4 });
+        this.bestText  = this.add.text(GAME_W-16, 12, 'Best: '+this.best, { fontSize: '22px', color: '#7a0040', stroke: '#fff', strokeThickness: 4 }).setOrigin(1,0);
+
+        this.unicornTimer = this.time.addEvent({ delay: 1100, loop: true, callback: () => this.spawnUnicorn(false) });
+
+        this.time.addEvent({ delay: 10000, loop: true, callback: () => { this.level++; } });
+      }
+
+      popParticles(x, y, count=8) {
+        this.particles.emitParticleAt(x, y, count);
+      }
+
+      spawnUnicorn(isSuper) {
+        const y = Phaser.Math.Between(140, 300);
+        const speed = -(180 + this.level * 30);
+
+        const bodyRect = this.add.rectangle(GAME_W + 40, y, isSuper ? 64 : 42, isSuper ? 64 : 42, 0x000000, 0);
+        this.physics.add.existing(bodyRect);
+        bodyRect.body.setAllowGravity(false);
+        bodyRect.body.setVelocityX(speed);
+
+        const emoji = isSuper ? '🦄✨' : '🦄';
+        const txt = this.add.text(bodyRect.x, y, emoji, { fontSize: isSuper ? '48px' : '36px' }).setOrigin(0.5);
+
+        bodyRect.visual = txt;
+        this.unicornBodies.add(bodyRect);
+        this.unicornTexts.add(txt);
+
+        bodyRect.update = () => {
+          txt.x = bodyRect.x; txt.y = bodyRect.y;
+          if (bodyRect.x < -60) {
+            txt.destroy();
+            bodyRect.destroy();
+          }
+        };
+
+        if (!isSuper) {
+          this.collected++;
+          if (this.collected % 10 === 0) {
+            this.time.delayedCall(400, () => this.spawnUnicorn(true));
+          }
+        }
+      }
+
+      collectUnicorn(uniBody) {
+        if (!uniBody.active) return;
+        const isSuper = (uniBody.visual?.text || '').includes('✨');
+        const pts = isSuper ? 5 : 1;
+        this.score += pts;
+        this.scoreText.setText('Punkte: ' + this.score);
+        if (this.score > this.best) {
+          this.best = this.score; this.bestText.setText('Best: ' + this.best);
+          localStorage.setItem('amelie_best', this.best);
+        }
+        this.popParticles(uniBody.x, uniBody.y, isSuper ? 20 : 10);
+        const pop = this.add.text(uniBody.x, uniBody.y - 24, `+${pts}`, { fontSize: '20px', color: '#7a0040', stroke: '#fff', strokeThickness: 4 }).setOrigin(0.5);
+        this.tweens.add({ targets: pop, y: pop.y - 30, alpha: 0, duration: 500, onComplete: () => pop.destroy() });
+
+        uniBody.visual?.destroy();
+        uniBody.destroy();
+      }
+
+      update() {
+        this.playerVisual.x = this.player.x; this.playerVisual.y = this.player.y - 6;
+        if (this.player.y > GAME_H - 100) this.player.y = GAME_H - 100;
+        this.unicornBodies.children.iterate(child => { if (child && child.update) child.update(); });
+      }
+    }
+
+    game.scene.add('main', MainScene, true);
+  })();
+  </script>
+</body>
+</html>
