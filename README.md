@@ -15,3 +15,8 @@ Einfach die Dateien (`index.html`) auf Vercel hochladen oder via CLI:
 ```bash
 npm i -g vercel
 vercel
+```
+
+## Credits
+💖 Idee, Umsetzung: Papa  
+💖 Junior Entwickler: Amelie ✨
