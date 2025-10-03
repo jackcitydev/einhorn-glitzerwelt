@@ -7,20 +7,17 @@
   <style>
     html, body { height: 100%; margin: 0; }
     body {
-      /* Rosa Regenbogen-Hintergrund */
       background: linear-gradient(180deg, #ffd1e8 0%, #ffc1df 25%, #ffb3d8 50%, #ff9fce 75%, #ff8ac5 100%);
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
       touch-action: none;
     }
     #game { max-width: 100vw; max-height: 100vh; }
-    .hint { position: fixed; left: 50%; transform: translateX(-50%); bottom: 40px; color: #7a0040; font-weight: 600; text-shadow: 0 1px 0 rgba(255,255,255,.7); }
     .signature { position: fixed; left: 50%; transform: translateX(-50%); bottom: 8px; font-size: 14px; color: #7a0040; text-shadow: 0 1px 0 rgba(255,255,255,.5); font-style: italic; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
 </head>
 <body>
   <div id="game"></div>
-  <div class="hint">Tipp: Tippen/Klicken = Springen (Doppelsprung möglich)</div>
   <div class="signature">Junior Entwickler Amelie ✨</div>
   <script>
   (() => {
@@ -38,10 +35,30 @@
         arcade: { gravity: { y: 1400 }, debug: false }
       },
       scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-      audio: { disableWebAudio: false }
     };
 
     const game = new Phaser.Game(config);
+
+    class StartScene extends Phaser.Scene {
+      constructor() { super('start'); }
+      create() {
+        this.add.text(GAME_W/2, GAME_H/2 - 60, 'Amelies Einhorn-Glitzer', {
+          fontSize: '32px', color: '#7a0040', stroke: '#fff', strokeThickness: 4
+        }).setOrigin(0.5);
+
+        this.add.text(GAME_W/2, GAME_H/2, 'Tippe irgendwo, um zu springen!\nFange die 🦄 für Punkte!', {
+          fontSize: '22px', color: '#7a0040', align: 'center', stroke: '#fff', strokeThickness: 3
+        }).setOrigin(0.5);
+
+        const startBtn = this.add.text(GAME_W/2, GAME_H/2 + 100, '▶️ Start', {
+          fontSize: '28px', color: '#fff', backgroundColor: '#ff2a7f', padding: {x:20,y:10}
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        startBtn.on('pointerdown', () => {
+          this.scene.start('main');
+        });
+      }
+    }
 
     class MainScene extends Phaser.Scene {
       constructor() { super('main'); }
@@ -65,6 +82,11 @@
 
         this.physics.add.collider(this.player, this.ground, () => { this.jumpCount = 0; });
 
+        // Erklärungstext über Amelie
+        this.add.text(this.playerVisual.x, this.playerVisual.y - 60, 'Das ist Amelie 💖\nTippe, damit sie springt!', {
+          fontSize: '18px', color: '#7a0040', stroke: '#fff', strokeThickness: 3, align: 'center'
+        }).setOrigin(0.5);
+
         const doJump = () => {
           if (this.player.body.blocked.down || this.jumpCount < 2) {
             this.player.body.setVelocityY(-560);
@@ -76,7 +98,6 @@
         this.input.keyboard?.on('keydown-SPACE', doJump);
 
         this.unicornBodies = this.physics.add.group();
-        this.unicornTexts = new Set();
 
         this.physics.add.overlap(this.player, this.unicornBodies, (player, uniBody) => {
           if (!uniBody.active) return;
@@ -92,16 +113,15 @@
           tint: [0xff7ab5, 0xffc1df, 0xffffff]
         });
 
-        this.title = this.add.text(GAME_W/2, 36, 'Amelies Einhorn-Glitzer', {
-          fontSize: '28px', fontStyle: '700', color: '#7a0040', stroke: '#ffffff', strokeThickness: 4
-        }).setOrigin(0.5);
-
         this.scoreText = this.add.text(16, 12, 'Punkte: 0', { fontSize: '22px', color: '#7a0040', stroke: '#fff', strokeThickness: 4 });
         this.bestText  = this.add.text(GAME_W-16, 12, 'Best: '+this.best, { fontSize: '22px', color: '#7a0040', stroke: '#fff', strokeThickness: 4 }).setOrigin(1,0);
 
         this.unicornTimer = this.time.addEvent({ delay: 1100, loop: true, callback: () => this.spawnUnicorn(false) });
 
         this.time.addEvent({ delay: 10000, loop: true, callback: () => { this.level++; } });
+
+        // Startanimation: Amelie springt gleich am Anfang
+        this.time.delayedCall(800, () => doJump());
       }
 
       popParticles(x, y, count=8) {
@@ -122,7 +142,6 @@
 
         bodyRect.visual = txt;
         this.unicornBodies.add(bodyRect);
-        this.unicornTexts.add(txt);
 
         bodyRect.update = () => {
           txt.x = bodyRect.x; txt.y = bodyRect.y;
@@ -165,7 +184,8 @@
       }
     }
 
-    game.scene.add('main', MainScene, true);
+    game.scene.add('start', StartScene, true);
+    game.scene.add('main', MainScene, false);
   })();
   </script>
 </body>
